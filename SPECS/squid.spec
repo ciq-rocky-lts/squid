@@ -2,7 +2,7 @@
 
 Name:     squid
 Version:  5.5
-Release:  6%{?dist}.8
+Release:  14%{?dist}.3
 Summary:  The Squid proxy caching server
 Epoch:    7
 # See CREDITS for breakdown of non GPLv2+ code
@@ -25,8 +25,8 @@ Source98: perl-requires-squid.sh
 # Upstream patches
 
 # Backported patches
-Patch101: squid-5.5-ip-bind-address-no-port.patch
 # https://bugzilla.redhat.com/show_bug.cgi?id=2151188
+Patch101: squid-5.5-ip-bind-address-no-port.patch
 
 # Local patches
 # Applying upstream patches first makes it less likely that local patches
@@ -46,6 +46,10 @@ Patch207: squid-5.0.6-active-ftp.patch
 Patch208: squid-5.1-test-store-cppsuite.patch
 # https://bugzilla.redhat.com/show_bug.cgi?id=2231827
 Patch209: squid-5.5-halfclosed.patch
+# https://issues.redhat.com/browse/RHEL-30352
+Patch210: squid-5.5-ipv6-crash.patch
+# https://issues.redhat.com/browse/RHEL-12356
+Patch211: squid-5.5-large-upload-buffer-dies.patch
 
 # Security patches
 # https://bugzilla.redhat.com/show_bug.cgi?id=2100721
@@ -58,7 +62,7 @@ Patch503: squid-5.5-CVE-2023-46846.patch
 Patch504: squid-5.5-CVE-2023-46847.patch
 # https://bugzilla.redhat.com/show_bug.cgi?id=2245919
 Patch505: squid-5.5-CVE-2023-46848.patch
-# https://bugzilla.redhat.com/show_bug.cgi?id=2245914
+# https://issues.redhat.com/browse/RHEL-14802
 Patch506: squid-5.5-CVE-2023-5824.patch
 # https://bugzilla.redhat.com/show_bug.cgi?id=2248521
 Patch507: squid-5.5-CVE-2023-46728.patch
@@ -68,12 +72,19 @@ Patch508: squid-5.5-CVE-2023-46724.patch
 Patch509: squid-5.5-CVE-2023-49285.patch
 # https://bugzilla.redhat.com/show_bug.cgi?id=2252923
 Patch510: squid-5.5-CVE-2023-49286.patch
-# https://bugzilla.redhat.com/show_bug.cgi?id=2264309
-Patch511: squid-5.5-CVE-2024-25617.patch
-# https://bugzilla.redhat.com/show_bug.cgi?id=2268366
-Patch512: squid-5.5-CVE-2024-25111.patch
 # https://bugzilla.redhat.com/show_bug.cgi?id=2254663
-Patch513: squid-5.5-CVE-2023-50269.patch
+Patch511: squid-5.5-CVE-2023-50269.patch
+# https://bugzilla.redhat.com/show_bug.cgi?id=2264309
+Patch512: squid-5.5-CVE-2024-25617.patch
+# https://bugzilla.redhat.com/show_bug.cgi?id=2268366
+Patch513: squid-5.5-CVE-2024-25111.patch
+# https://bugzilla.redhat.com/show_bug.cgi?id=2294353
+Patch514: squid-5.5-CVE-2024-37894.patch
+# https://bugzilla.redhat.com/show_bug.cgi?id=2260051
+Patch515: squid-5.5-CVE-2024-23638.patch
+# Regression caused by squid-5.5-CVE-2023-46846.patch
+# Upstream PR: https://github.com/squid-cache/squid/pull/1914
+Patch516: squid-5.5-ignore-wsp-after-chunk-size.patch
 
 # cache_swap.sh
 Requires: bash gawk
@@ -91,8 +102,6 @@ BuildRequires: openssl-devel
 BuildRequires: krb5-devel
 # time_quota requires TrivialDB
 BuildRequires: libtdb-devel
-# ESI support requires Expat & libxml2
-BuildRequires: expat-devel libxml2-devel
 # TPROXY requires libcap, and also increases security somewhat
 BuildRequires: libcap-devel
 # eCAP support
@@ -148,6 +157,8 @@ lookup program (dnsserver), a program for retrieving FTP data
 %patch207 -p1 -b .active-ftp
 %patch208 -p1 -b .test-store-cpp
 %patch209 -p1 -b .halfclosed
+%patch210 -p1 -b .ipv6-crash
+%patch211 -p1 -b .large-upload-buffer-dies
 
 %patch501 -p1 -b .CVE-2021-46784
 %patch502 -p1 -b .CVE-2022-41318
@@ -159,9 +170,13 @@ lookup program (dnsserver), a program for retrieving FTP data
 %patch508 -p1 -b .CVE-2023-46724
 %patch509 -p1 -b .CVE-2023-49285
 %patch510 -p1 -b .CVE-2023-49286
-%patch511 -p1 -b .CVE-2024-25617
-%patch512 -p1 -b .CVE-2024-25111
-%patch513 -p1 -b .CVE-2023-50269
+%patch511 -p1 -b .CVE-2023-50269
+%patch512 -p1 -b .CVE-2024-25617
+%patch513 -p1 -b .CVE-2024-25111
+%patch514 -p1 -b .CVE-2024-37894
+%patch515 -p1 -b .CVE-2024-23638
+%patch516 -p1 -b .ignore-wsp-chunk-sz
+
 
 # https://bugzilla.redhat.com/show_bug.cgi?id=1679526
 # Patch in the vendor documentation and used different location for documentation
@@ -204,7 +219,7 @@ sed -i 's|@SYSCONFDIR@/squid.conf.documented|%{_pkgdocdir}/squid.conf.documented
    --enable-storeio="aufs,diskd,ufs,rock" \
    --enable-diskio \
    --enable-wccpv2 \
-   --enable-esi \
+   --disable-esi \
    --enable-ecap \
    --with-aio \
    --with-default-user="squid" \
@@ -388,41 +403,57 @@ fi
 
 
 %changelog
-* Thu Mar 14 2024 Luboš Uhliarik <luhliari@redhat.com> - 7:5.5-6.8
-- Resolves: RHEL-19555 - squid: denial of service in HTTP request
-  parsing (CVE-2023-50269)
+* Thu Nov 07 2024 Luboš Uhliarik <luhliari@redhat.com> - 7:5.5-14.3
+- Disable ESI support
+- Resolves: RHEL-65076 - CVE-2024-45802 squid: Denial of Service processing ESI
+  response content
 
-* Fri Mar 08 2024 Luboš Uhliarik <luhliari@redhat.com> - 7:5.5-6.7
-- Resolves: RHEL-28614 - squid: Denial of Service in HTTP Chunked
+* Wed Oct 23 2024 Luboš Uhliarik <luhliari@redhat.com> - 7:5.5-14.2
+- Resolves: RHEL-64425 TCP_MISS_ABORTED/100 erros when uploading
+
+* Mon Oct 14 2024 Luboš Uhliarik <luhliari@redhat.com> - 7:5.5-14.1
+- Resolves: RHEL-62332 - (Regression) Transfer-encoding:chunked data is not sent
+  to the client in its complementary
+
+* Mon Jul 01 2024 Luboš Uhliarik <luhliari@redhat.com> - 7:5.5-14
+- Resolves: RHEL-45057 - squid: Out-of-bounds write error may lead to Denial of 
+  Service (CVE-2024-37894)
+- Resolves: RHEL-22594 - squid: vulnerable to a Denial of Service attack against
+  Cache Manager error responses (CVE-2024-23638)
+
+* Thu May 09 2024 Luboš Uhliarik <luhliari@redhat.com> - 7:5.5-13
+- Resolves: RHEL-30352 - squid v5 crashes with SIGABRT when ipv6 is disabled
+  at kernel level but it is asked to connect to an ipv6 address by a client
+
+* Tue Mar 19 2024 Luboš Uhliarik <luhliari@redhat.com> - 7:5.5-12
+- Resolves: RHEL-28530 - squid: Denial of Service in HTTP Chunked
   Decoding (CVE-2024-25111)
-
-* Mon Feb 26 2024 Luboš Uhliarik <luhliari@redhat.com> - 7:5.5-6.6
-- Resolves: RHEL-26091 - squid: denial of service in HTTP header
+- Resolves: RHEL-26092 - squid: denial of service in HTTP header
   parser (CVE-2024-25617)
 
-* Wed Dec 06 2023 Luboš Uhliarik <luhliari@redhat.com> - 7:5.5-6.5
-- Resolves: RHEL-18484 - squid: Buffer over-read in the HTTP Message processing
+* Fri Feb 02 2024 Luboš Uhliarik <luhliari@redhat.com> - 7:5.5-10
+- Resolves: RHEL-19556 - squid: denial of service in HTTP request
+  parsing (CVE-2023-50269)
+
+* Thu Feb 01 2024 Luboš Uhliarik <luhliari@redhat.com> - 7:5.5-9
+- Resolves: RHEL-18354 - squid: Buffer over-read in the HTTP Message processing
   feature (CVE-2023-49285)
-- Resolves: RHEL-18486 - squid: Incorrect Check of Function Return Value In
+- Resolves: RHEL-18345 - squid: Incorrect Check of Function Return Value In
   Helper Process management (CVE-2023-49286)
-
-* Wed Dec 06 2023 Luboš Uhliarik <luhliari@redhat.com> - 7:5.5-6.4
-- Resolves: RHEL-16767 - squid: Denial of Service in SSL Certificate validation
+- Resolves: RHEL-18146 - squid crashes in assertion when a parent peer exists
+- Resolves: RHEL-18231 - squid: Denial of Service in SSL Certificate validation
   (CVE-2023-46724)
-- Resolves: RHEL-18250 - squid crashes in assertion when a parent peer exists
-
-* Wed Dec 06 2023 Luboš Uhliarik <luhliari@redhat.com> - 7:5.5-6.3
-- Resolves: RHEL-16778 - squid: NULL pointer dereference in the gopher protocol
+- Resolves: RHEL-15912 - squid: NULL pointer dereference in the gopher protocol
   code (CVE-2023-46728)
 
-* Mon Nov 06 2023 Luboš Uhliarik <luhliari@redhat.com> - 7:5.5-6.2
-- Resolves: RHEL-14800 - squid: squid multiple issues in HTTP response caching
+* Tue Dec 05 2023 Tomas Korbar <tkorbar@redhat.com> - 7:5.5-8
+- Resolves: RHEL-14802 - squid: multiple issues in HTTP response caching
 
-* Mon Oct 30 2023 Luboš Uhliarik <luhliari@redhat.com> - 7:5.5-6.1
-- Resolves: RHEL-14819 - squid: squid: denial of Servicein FTP
-- Resolves: RHEL-14807 - squid: squid: Denial of Service in HTTP Digest
+* Sun Nov 12 2023 Luboš Uhliarik <luhliari@redhat.com> - 7:5.5-7
+- Resolves: RHEL-14820 - squid: squid: denial of Servicein FTP
+- Resolves: RHEL-14809 - squid: squid: Denial of Service in HTTP Digest
   Authentication
-- Resolves: RHEL-14780 - squid: squid: Request/Response smuggling in HTTP/1.1
+- Resolves: RHEL-14781 - squid: squid: Request/Response smuggling in HTTP/1.1
   and ICAP
 
 * Wed Aug 16 2023 Luboš Uhliarik <luhliari@redhat.com> - 7:5.5-6
