@@ -4,7 +4,7 @@
 
 Name:     squid
 Version:  3.5.20
-Release:  17.1%{?dist}.10
+Release:  17.2%{?dist}.10
 Summary:  The Squid proxy caching server
 Epoch:    7
 # See CREDITS for breakdown of non GPLv2+ code
@@ -110,6 +110,8 @@ Patch522: squid-3.5.20-CVE-2021-28651.patch
 Patch523: squid-3.5.20-CVE-2021-28652.patch
 Patch524: squid-3.5.20-CVE-2021-31806-31807-31808.patch
 Patch525: squid-3.5.20-CVE-2021-33620.patch
+# CVE-2026-33526 - Rocky r8 squid-4.15-CVE-2026-33526.patch, hunk offset rebased to 3.5.20
+Patch526: squid-3.5.20-CVE-2026-33526.patch
 
 Buildroot: %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 Requires: bash >= 2.0
@@ -221,6 +223,7 @@ migration and script which prepares squid for downgrade operation.
 %patch523 -p1 -b .CVE-2021-28652
 %patch524 -p1 -b .CVE-2021-31806-31807-31808
 %patch525 -p1 -b .CVE-2021-33620
+%patch526 -p1 -b .CVE-2026-33526
 
 # https://bugzilla.redhat.com/show_bug.cgi?id=1471140
 # Patch in the vendor documentation and used different location for documentation
@@ -451,7 +454,10 @@ fi
     chgrp squid /var/cache/samba/winbindd_privileged >/dev/null 2>&1 || :
 
 %changelog
-* Mon Nov 25 2024 Matt Hink <mhink@ciq.com> - 7:3.5.1.20-17.10
+* Sun Aug 30 2026 Jason Rodriguez <jrodriguez@ciq.com> - 7:3.5.20-17.2.10
+- Fix CVE-2026-33526
+
+* Mon Nov 25 2024 Matt Hink <mhink@ciq.com> - 7:3.5.20-17.1.10
 - CVE-2021-28651 CVE-2021-28652 CVE-2021-31806 CVE-2021-31807 CVE-2021-31808 CVE-2021-33620 CVE-2024-45802
 
 * Tue Feb 06 2024 Stepan Broz <sbroz@redhat.com> - 7:3.5.20-17.10
