@@ -2,7 +2,7 @@
 
 Name:     squid
 Version:  5.5
-Release:  14%{?dist}.3
+Release:  14.1%{?dist}.3
 Summary:  The Squid proxy caching server
 Epoch:    7
 # See CREDITS for breakdown of non GPLv2+ code
@@ -85,6 +85,8 @@ Patch515: squid-5.5-CVE-2024-23638.patch
 # Regression caused by squid-5.5-CVE-2023-46846.patch
 # Upstream PR: https://github.com/squid-cache/squid/pull/1914
 Patch516: squid-5.5-ignore-wsp-after-chunk-size.patch
+# CVE-2026-33526 - Rocky r9 SOURCES/squid-5.5-CVE-2026-33526.patch, verbatim
+Patch517: squid-5.5-CVE-2026-33526.patch
 
 # cache_swap.sh
 Requires: bash gawk
@@ -176,6 +178,7 @@ lookup program (dnsserver), a program for retrieving FTP data
 %patch514 -p1 -b .CVE-2024-37894
 %patch515 -p1 -b .CVE-2024-23638
 %patch516 -p1 -b .ignore-wsp-chunk-sz
+%patch517 -p1 -b .CVE-2026-33526
 
 
 # https://bugzilla.redhat.com/show_bug.cgi?id=1679526
@@ -403,6 +406,9 @@ fi
 
 
 %changelog
+* Tue Sep 01 2026 Jason Rodriguez <jrodriguez@ciq.com> - 7:5.5-14.1.3
+- Fix CVE-2026-33526
+
 * Thu Nov 07 2024 Luboš Uhliarik <luhliari@redhat.com> - 7:5.5-14.3
 - Disable ESI support
 - Resolves: RHEL-65076 - CVE-2024-45802 squid: Denial of Service processing ESI
